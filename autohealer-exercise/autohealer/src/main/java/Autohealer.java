@@ -26,13 +26,15 @@ import org.apache.zookeeper.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 public class Autohealer implements Watcher {
 
     private static final String ZOOKEEPER_ADDRESS = "localhost:2181";
     private static final int SESSION_TIMEOUT = 3000;
 
-    // Parent Znode where each worker stores an ephemeral child to indicate it is alive
+    // Parent Znode where each worker stores an ephemeral child to indicate it is
+    // alive
     private static final String AUTOHEALER_ZNODES_PATH = "/workers";
 
     // Path to the worker jar
@@ -49,7 +51,7 @@ public class Autohealer implements Watcher {
 
     public void startWatchingWorkers() throws KeeperException, InterruptedException {
         if (zooKeeper.exists(AUTOHEALER_ZNODES_PATH, false) == null) {
-            zooKeeper.create(AUTOHEALER_ZNODES_PATH, new byte[]{}, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zooKeeper.create(AUTOHEALER_ZNODES_PATH, new byte[] {}, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         }
         launchWorkersIfNecessary();
     }
@@ -81,20 +83,29 @@ public class Autohealer implements Watcher {
                     }
                 }
                 break;
-            /**
-             * Add states code here to respond to the relevant events
-             */
+            case NodeChildrenChanged:
+                launchWorkersIfNecessary();
+
         }
     }
 
     private void launchWorkersIfNecessary() {
-        /**
-         * Implement this method to watch and launch new workers if necessary
-         */
+        try {
+            List<String> children = zooKeeper.getChildren(AUTOHEALER_ZNODES_PATH, this);
+            System.out.println(String.format("Currently there are %d workers", children.size()));
+            if (children.size() < numberOfWorkers) {
+                startNewWorker();
+            }
+        } catch (InterruptedException | KeeperException | IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+
     }
 
     /**
      * Helper method to start a single worker
+     * 
      * @throws IOException
      */
     private void startNewWorker() throws IOException {
